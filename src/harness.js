@@ -86,14 +86,14 @@ JSPG.loadGameState = function() {
 }
 
 JSPG.saveGameState = function() {
-    if (!supports_html5_storage()) { return false; }
-    localStorage["JSPG.gameInProgress"] = true;
-    
-    localStorage["JSPG.maxLevel"] = JSPG.maxLevel;
-    localStorage["JSPG.wonGame"] = JSPG.wonGame;
-    localStorage["JSPG.level"] = JSPG.level;
+	if (!supports_html5_storage()) { return false; }
+	// localStorage["JSPG.gameInProgress"] = true; //temp disable for testing
 
-    localStorage["JSPG.map"] = JSON.stringify(JSPG.map);
+	localStorage["JSPG.maxLevel"] = JSPG.maxLevel;
+	localStorage["JSPG.wonGame"] = JSPG.wonGame;
+	localStorage["JSPG.level"] = JSPG.level;
+
+	localStorage["JSPG.map"] = JSON.stringify(JSPG.map);
 }
 
 JSPG.startSession = function(){
@@ -106,6 +106,11 @@ JSPG.startSession = function(){
 	JSPG.renderBox = [20,20,w-20,h-20];
 
 	JSPG.loadGameState();
+
+	//Start new game
+	if(!JSPG.gameInProgress){
+		JSPG.startGame();
+	}
 
 	JSPG.dirtyCanvas = true;
 
@@ -135,71 +140,66 @@ JSPG.mouseUp = function(){return JSPG.mouse === "up";};
 
 
 JSPG.drawGame = function(){
-	var context = JSPG.ctx;
-	var ctx = context; //alias
+	JSPG.drawMap();
+};
+
+JSPG.drawMap = function(){
+	var ctx = JSPG.ctx;
+	ctx.save();
 
 	var w = JSPG.canvas.width;
 	var h = JSPG.canvas.height;
 
+	var renderWidth  = JSPG.getRenderBoxWidth();
+	var renderHeight = JSPG.getRenderBoxHeight();
+
+	var boxWidth = renderWidth / JSPG.map.w;
+	var boxHeight = renderHeight / JSPG.map.h;
+
+	var xStart = JSPG.renderBox[0];
+	var yStart = JSPG.renderBox[1];
+
+	var x,y;
+	var index;
+	var color,tileValue,tileType;
+
+	for(y = 0; y < JSPG.map.h; y++){
+		for(x = 0; x < JSPG.map.w; x++){
+			index = x+y*JSPG.map.w;
+			xDraw = xStart + x * boxWidth;
+			yDraw = yStart + y * boxHeight;
+
+			tileValue = JSPG.map[index].value;
+			tileType  = JSPG.map[index].type;
+
+			color = [2.5*tileValue,0,0];
+
+			if(tileType == "start"){
+				color = [0,255,0];
+			}else if(tileType == "finish"){
+				color = [0,0,255];
+			}
+
+			ctx.fillStyle = JSPG.arrayColorToString(color);
+
+			ctx.fillRect(xDraw,yDraw,boxWidth,boxHeight);
+		}
+	}
+
+	ctx.restore();
 };
 
-//Events
-JSPG.initEvents = function(){
-	$(document).mouseup(function (e) {
-		JSPG.mouse = "up";
-
-		var offset = $("#gameCanvas").offset();
-		var x = e.pageX - offset.left;
-		var y = e.pageY - offset.top;
-
-		//Convert to internal coord system
-		var internalPoint = JSPG.renderToInternalSpace(x,y);
-		x = internalPoint[0];
-		y = internalPoint[1];
-	});
-
-	$(document).mousedown(function (e) {
-		JSPG.mouse = "down";
-
-		var offset = $("#gameCanvas").offset();
-		var x = e.pageX - offset.left;
-		var y = e.pageY - offset.top;
-
-		//Convert to internal coord system
-		var internalPoint = JSPG.renderToInternalSpace(x,y);
-		x = internalPoint[0];
-		y = internalPoint[1];
-	});
-
-	$(document).mousemove(function (e) {
-		var offset = $("#gameCanvas").offset();
-		var x = e.pageX - offset.left;
-		var y = e.pageY - offset.top;
-
-		//Convert to intenal coord system
-		var internalPoint = JSPG.renderToInternalSpace(x,y);
-		x = internalPoint[0];
-		y = internalPoint[1];
-	});
-
-	$(document).keypress(function (e) {
-		console.log("keypress: ", e.charCode);
-
-		//112 = 'p'
-		//114 = 'r'
-		//115 = 's'
-	});
-};
-
-JSPG.move = function(x,y){
+JSPG.mousemove = function(x,y){
 	
 };
 
-JSPG.down = function(x,y){
-	
+JSPG.mousedown = function(x,y){
+	JSPG.mouse = "down";
+
 };
 
-JSPG.up = function(x,y){
+JSPG.mouseup = function(x,y){
+	JSPG.mouse = "up";
 	
 };
 
@@ -246,7 +246,58 @@ JSPG.winGame = function(){
 	JSPG.wonGame = true;
 };
 
-// Fonts
+
+// *** Events ***
+JSPG.initEvents = function(){
+	$(document).mouseup(function (e) {
+		var offset = $("#gameCanvas").offset();
+		var x = e.pageX - offset.left;
+		var y = e.pageY - offset.top;
+
+		//Convert to internal coord system
+		var internalPoint = JSPG.renderToInternalSpace(x,y);
+		x = internalPoint[0];
+		y = internalPoint[1];
+
+		JSPG.mouseup(x,y);
+	});
+
+	$(document).mousedown(function (e) {
+		var offset = $("#gameCanvas").offset();
+		var x = e.pageX - offset.left;
+		var y = e.pageY - offset.top;
+
+		//Convert to internal coord system
+		var internalPoint = JSPG.renderToInternalSpace(x,y);
+		x = internalPoint[0];
+		y = internalPoint[1];
+		
+		JSPG.mousedown(x,y);
+	});
+
+	$(document).mousemove(function (e) {
+		var offset = $("#gameCanvas").offset();
+		var x = e.pageX - offset.left;
+		var y = e.pageY - offset.top;
+
+		//Convert to intenal coord system
+		var internalPoint = JSPG.renderToInternalSpace(x,y);
+		x = internalPoint[0];
+		y = internalPoint[1];
+
+		JSPG.mousemove(x,y);
+	});
+
+	$(document).keypress(function (e) {
+		console.log("keypress: ", e.charCode);
+
+		//112 = 'p'
+		//114 = 'r'
+		//115 = 's'
+	});
+};
+
+// *** Fonts ***
 WebFontConfig = {
 	google: { families: [ 'Libre+Baskerville::latin' ] },
 	active: function() {
@@ -264,7 +315,7 @@ WebFontConfig = {
     s.parentNode.insertBefore(wf, s);
   })();
 
-//LocalStorage Check
+// *** LocalStorage Check ***
 function supports_html5_storage() {
 	try {
 		return 'localStorage' in window && window['localStorage'] !== null;

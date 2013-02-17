@@ -1,14 +1,14 @@
 JSPG.createMap = function(){
 	var map = {};
 
-	var w = 20;
-	var h = 20;
+	var w = 30;
+	var h = 30;
 
 	map.w = w;
 	map.h = h;
 
-	map.start = [0,0];
-	map.finish = [w-1,h-1];
+	map.start = [0+5,h/2|0];
+	map.finish = [w-1-5,h/2|0];
 
 	map.tiles = [];
 
@@ -51,6 +51,10 @@ JSPG.setTileType = function(map,x,y,type){
 	map.tiles[x+y*map.w].type = type;	
 };
 
+
+// A rather basic implementation of Dijkstra's algorithm
+// A* seach would probably be faster, but this is fast enough
+// for the sized maps I plan to use
 JSPG.findShortestPath = function(map){
 	if(typeof map !== "object"){map = JSPG.map;}
 

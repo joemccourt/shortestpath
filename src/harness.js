@@ -118,14 +118,14 @@ JSPG.startSession = function(){
 }
 
 JSPG.internalToRenderSpace = function(x,y){
-	var xRender = (x + 1) * JSPG.getRenderBoxWidth() / 2  + JSPG.renderBox[0];
-	var yRender = (y + 1) * JSPG.getRenderBoxHeight() / 2 + JSPG.renderBox[1];
+	var xRender = x * JSPG.getRenderBoxWidth()  + JSPG.renderBox[0];
+	var yRender = y * JSPG.getRenderBoxHeight() + JSPG.renderBox[1];
 	return [xRender,yRender];
 };
 
 JSPG.renderToInternalSpace = function(x,y){
-	var xInternal = 2 * (x - JSPG.renderBox[0]) / JSPG.getRenderBoxWidth()  - 1;
-	var yInternal = 2 * (y - JSPG.renderBox[1]) / JSPG.getRenderBoxHeight() - 1;
+	var xInternal = (x - JSPG.renderBox[0]) / JSPG.getRenderBoxWidth();
+	var yInternal = (y - JSPG.renderBox[1]) / JSPG.getRenderBoxHeight();
 	return [xInternal,yInternal];
 };
 
@@ -243,6 +243,18 @@ JSPG.mousemove = function(x,y){
 
 JSPG.mousedown = function(x,y){
 	JSPG.mouse = "down";
+
+	var w = JSPG.map.w;
+	var h = JSPG.map.h;
+
+	var tiles = JSPG.map.tiles;
+	var tileIndex = (x*w|0)+w*(y*h|0);
+	console.log(tiles[tileIndex].value);
+
+	tiles[tileIndex].value += 50;
+	JSPG.dirtyCanvas = true;
+
+	JSPG.map.shortestPath = JSPG.findShortestPath();
 
 };
 

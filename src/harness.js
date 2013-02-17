@@ -141,6 +141,7 @@ JSPG.mouseUp = function(){return JSPG.mouse === "up";};
 
 JSPG.drawGame = function(){
 	JSPG.drawMap();
+	JSPG.drawPath();
 };
 
 JSPG.drawMap = function(){
@@ -169,8 +170,8 @@ JSPG.drawMap = function(){
 			xDraw = xStart + x * boxWidth;
 			yDraw = yStart + y * boxHeight;
 
-			tileValue = JSPG.map[index].value;
-			tileType  = JSPG.map[index].type;
+			tileValue = JSPG.map.tiles[index].value;
+			tileType  = JSPG.map.tiles[index].type;
 
 			color = [2.5*tileValue,0,0];
 
@@ -185,6 +186,53 @@ JSPG.drawMap = function(){
 			ctx.fillRect(xDraw,yDraw,boxWidth,boxHeight);
 		}
 	}
+
+	ctx.restore();
+};
+
+JSPG.drawPath = function(){
+	var path = JSPG.map.shortestPath;
+
+	if(typeof path !== "object" || path.length <= 0){return;}
+	var ctx = JSPG.ctx;
+	ctx.save();
+
+	var w = JSPG.canvas.width;
+	var h = JSPG.canvas.height;
+
+	var renderWidth  = JSPG.getRenderBoxWidth();
+	var renderHeight = JSPG.getRenderBoxHeight();
+
+	var boxWidth = renderWidth / JSPG.map.w;
+	var boxHeight = renderHeight / JSPG.map.h;
+
+	var xStart = JSPG.renderBox[0];
+	var yStart = JSPG.renderBox[1];
+
+	ctx.beginPath();
+
+	var x = path[0][0];
+	var y = path[0][1];
+	var index = x+y*JSPG.map.w;
+	var xDraw = xStart + (x+0.5) * boxWidth;
+	var yDraw = yStart + (y+0.5) * boxHeight;
+	ctx.moveTo(xDraw+0.5,yDraw+0.5);
+
+	var i;
+	for(i = 1; i < path.length; i++){
+		x = path[i][0];
+		y = path[i][1];
+		index = x+y*JSPG.map.w;
+		xDraw = xStart + (x+0.5) * boxWidth;
+		yDraw = yStart + (y+0.5) * boxHeight;
+
+		ctx.lineTo(xDraw+0.5,yDraw+0.5);
+	}
+
+	//ctx.closePath();
+	ctx.strokeStyle = 'white';
+	ctx.lineWidth = 3;
+	ctx.stroke();
 
 	ctx.restore();
 };

@@ -7,10 +7,17 @@ JSPG.startTime = (new Date()).getTime();
 JSPG.clockTime = 0;
 JSPG.lastFrameTime = 0;
 JSPG.fps = 0;
+JSPG.startNewLevelAnimationTime = 0;
+JSPG.newLevelAnimationTime = 500;
+
+JSPG.UIFreq = 10;
+JSPG.lastUIUpdateTime = 0;
 
 JSPG.mouse = "up";
 
 JSPG.renderBox = [0,0,0,0];
+
+JSPG.editValueAmount = 20;
 
 JSPG.maxLevel = 1;
 JSPG.level = JSPG.maxLevel;
@@ -20,11 +27,15 @@ JSPG.font = 'Verdana'; //Default font before new one loaded
 
 //State bools
 JSPG.dirtyCanvas = true;  //Keep track of when state has changed and need to update canvas
-
 JSPG.gameInProgress = false;
 JSPG.wonGame = false;
-
 JSPG.toSaveGame = true;
+JSPG.startNewLevelAnimation = false;
+JSPG.animatingNewLevel = false;
+
+JSPG.lastMouseDownIndex = -1;
+
+JSPG.mouseAction = "add";
 
 window.onload = function(){
 	JSPG.startSession();
@@ -35,17 +46,42 @@ JSPG.animate = function(time){
 
 	var ctx = JSPG.ctx;
 	
+	if(JSPG.startNewLevelAnimation){
+		JSPG.startNewLevelAnimation = false;
+		JSPG.animatingNewLevel = true;
+		JSPG.startNewLevelAnimationTime = time;
+		JSPG.dirtyCanvas = true;
+	}
+
+	if(JSPG.animatingNewLevel && time - JSPG.startNewLevelAnimationTime > JSPG.newLevelAnimationTime){
+		JSPG.animatingNewLevel = false;
+	}
+
 	if(JSPG.dirtyCanvas){
 
 		JSPG.dirtyCanvas = false;
 
-		JSPG.drawBackground();		
+		JSPG.drawBackground();
 
 		JSPG.drawGame();
+
+		if(JSPG.animatingNewLevel){
+			JSPG.newLevelAnimation(time - JSPG.startNewLevelAnimationTime);
+			JSPG.dirtyCanvas = true;
+		}
 
 		if(JSPG.checkWon && !JSPG.wonGame){
 			JSPG.checkWon = false;
 			//check if won game
+			if(JSPG.pathEqualsPath(JSPG.map.goalPath,JSPG.map.shortestPath)){
+				
+				JSPG.winGame();
+			}
+		}
+
+		if(time - JSPG.lastUIUpdateTime > 1000/JSPG.UIFreq){
+			$('#fps').text("FPS: "+(JSPG.fps+0.5|0));
+			$('#score').text("Score: "+JSPG.totalAdded);
 		}
 
 		console.log("animate! fps: " + (JSPG.fps+0.5|0));
@@ -69,7 +105,13 @@ JSPG.startGame = function(){
 	JSPG.dirtyCanvas = true;
 	JSPG.wonGame = false;
 
-	JSPG.map = JSPG.createMap();
+	//JSPG.map = JSPG.createMap();
+	JSPG.map = JSON.parse(JSPG.levels['level'+JSPG.level]);
+	JSPG.map.goalPath = JSPG.buildGoalPath(JSPG.map);
+	//console.log(JSPG.map.goalPath,JSPG.map.shortestPath);
+
+	JSPG.startNewLevelAnimation = true;
+	JSPG.totalAdded = 0;
 
 	JSPG.saveGameState();
 };
@@ -142,7 +184,8 @@ JSPG.mouseUp = function(){return JSPG.mouse === "up";};
 
 JSPG.drawGame = function(){
 	JSPG.drawMap();
-	JSPG.drawPath();
+	JSPG.drawPath(JSPG.map.shortestPath,"current");
+	JSPG.drawPath(JSPG.map.goalPath,"goal");
 };
 
 JSPG.drawMap = function(){
@@ -174,12 +217,14 @@ JSPG.drawMap = function(){
 			tileValue = JSPG.map.tiles[index].value;
 			tileType  = JSPG.map.tiles[index].type;
 
-			color = [2.5*tileValue,0,0];
+			color = [2.55*tileValue,0,0];
 
 			if(tileType == "start"){
-				color = [0,255,0];
+				color = [0,0,255];
 			}else if(tileType == "finish"){
 				color = [0,0,255];
+			}else if(tileType == "goal"){
+				//color = [2.55*tileValue,255,0];
 			}
 
 			ctx.fillStyle = JSPG.arrayColorToString(color);
@@ -191,8 +236,7 @@ JSPG.drawMap = function(){
 	ctx.restore();
 };
 
-JSPG.drawPath = function(){
-	var path = JSPG.map.shortestPath;
+JSPG.drawPath = function(path,pathType){
 
 	if(typeof path !== "object" || path.length <= 0){return;}
 	var ctx = JSPG.ctx;
@@ -227,19 +271,51 @@ JSPG.drawPath = function(){
 		xDraw = xStart + (x+0.5) * boxWidth;
 		yDraw = yStart + (y+0.5) * boxHeight;
 
-		ctx.lineTo(xDraw+0.5,yDraw+0.5);
+		if(pathType === "goal"){
+			ctx.strokeStyle = 'rgba(0,150,0,0.5)';
+			ctx.lineTo(xDraw+0.5,yDraw+0.5);
+		}else{
+			ctx.strokeStyle = 'white';
+			ctx.lineTo(xDraw+0.5,yDraw+0.5);
+		}
 	}
 
 	//ctx.closePath();
-	ctx.strokeStyle = 'white';
 	ctx.lineWidth = 3;
 	ctx.stroke();
 
 	ctx.restore();
 };
 
+JSPG.newLevelAnimation = function(time){
+	var ctx = JSPG.ctx;
+	ctx.save();
+
+	ctx.fillStyle = 'rgba(0,150,0,'+(1-time/JSPG.newLevelAnimationTime)+')';
+
+	//Box border
+	ctx.beginPath();
+    ctx.moveTo(JSPG.renderBox[0]-0.5,JSPG.renderBox[1]-0.5);
+    ctx.lineTo(JSPG.renderBox[0]-0.5,JSPG.renderBox[3]+0.5);
+    ctx.lineTo(JSPG.renderBox[2]+0.5,JSPG.renderBox[3]+0.5);
+    ctx.lineTo(JSPG.renderBox[2]+0.5,JSPG.renderBox[1]-0.5);
+    ctx.lineTo(JSPG.renderBox[0]-0.5,JSPG.renderBox[1]-0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();	
+};
+
 JSPG.mousemove = function(x,y){
-	
+	var w = JSPG.map.w;
+	var h = JSPG.map.h;
+
+	var tileIndex = (x*w|0)+w*(y*h|0);
+
+	if(JSPG.mouse === "down" && tileIndex != JSPG.lastMouseDownIndex){
+		JSPG.mousedown(x,y);
+	}
+
 };
 
 JSPG.mousedown = function(x,y){
@@ -252,9 +328,26 @@ JSPG.mousedown = function(x,y){
 	var tileIndex = (x*w|0)+w*(y*h|0);
 	console.log(tiles[tileIndex].value);
 
-	tiles[tileIndex].value += 50;
-	JSPG.dirtyCanvas = true;
+	JSPG.lastMouseDownIndex = tileIndex;
+	if(JSPG.mouseAction == "add"){
+		tiles[tileIndex].value += JSPG.editValueAmount;
+		JSPG.totalAdded += JSPG.editValueAmount;
+	}else if(JSPG.mouseAction == "subtract"){
+		tiles[tileIndex].value -=  JSPG.editValueAmount;
+		if(tiles[tileIndex].value < 0){
+			tiles[tileIndex].value = 0;
+		}
+	}else if(JSPG.mouseAction == "goal"){
+		if(tiles[tileIndex].type == "goal"){
+			tiles[tileIndex].type = "normal";
+		}else{
+			tiles[tileIndex].type = "goal";
+		}
+	}
 
+	JSPG.dirtyCanvas = true;
+	JSPG.checkWon = true;
+	JSPG.toSaveGame = true;
 	JSPG.map.shortestPath = JSPG.findShortestPath();
 
 };
@@ -304,7 +397,11 @@ JSPG.winGame = function(){
 
 	}
 
+	JSPG.level++;
+
+	console.log("you win!");
 	JSPG.wonGame = true;
+	JSPG.startGame();
 };
 
 
@@ -349,12 +446,33 @@ JSPG.initEvents = function(){
 		JSPG.mousemove(x,y);
 	});
 
-	$(document).keypress(function (e) {
-		console.log("keypress: ", e.charCode);
-
+	$(document).keydown(function (e) {
+		console.log("keypress: ", e.which);
 		//112 = 'p'
 		//114 = 'r'
 		//115 = 's'
+		// 37 - left
+		// 38 - up
+		// 39 - right
+		// 40 - down
+
+		switch (e.which){
+			case 38:
+				JSPG.editValueAmount += 10;
+			break;
+
+			case 40:
+				JSPG.editValueAmount -= 10;
+				if(JSPG.editValueAmount < 10){
+					JSPG.editValueAmount = 10;
+				}
+			break;
+		}
+	});
+
+
+	$('#mouseAction').change(function() {
+		JSPG.mouseAction = $(this).val();
 	});
 };
 

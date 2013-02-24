@@ -1,8 +1,8 @@
 JSPG.createMap = function(){
 	var map = {};
 
-	var w = 30;
-	var h = 30;
+	var w = 20;
+	var h = 20;
 
 	map.w = w;
 	map.h = h;
